@@ -4,10 +4,10 @@ import subprocess
 
 def run_cmd(command, cwd=None):
     print(f"\n> Executing: {command}")
-    # Add current directory to PYTHONPATH so phase_2 is visible
+    # Add phase-2 directory to PYTHONPATH so 'src' is visible
     env = os.environ.copy()
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    env["PYTHONPATH"] = project_root + os.pathsep + env.get("PYTHONPATH", "")
+    phase2_root = os.path.dirname(os.path.abspath(__file__))
+    env["PYTHONPATH"] = phase2_root + os.pathsep + env.get("PYTHONPATH", "")
     
     try:
         subprocess.run(command, shell=True, check=True, cwd=cwd, env=env)
@@ -16,7 +16,37 @@ def run_cmd(command, cwd=None):
         print(f"\n[Error] Command failed: {e}")
         return False
 
+def smoke_test():
+    """Performs a quick system integrity check for CI/CD."""
+    print("\n" + "="*30)
+    print("   SMOKE TEST (CI/CD)")
+    print("="*30)
+    try:
+        from src.semantic_graph import SemanticGraph
+        print("[1/3] Importing core modules... OK")
+        
+        graph = SemanticGraph(similarity_threshold=0.5)
+        graph.add_bidirectional_edge("A", "B", 0.8)
+        print("[2/3] Graph construction... OK")
+        
+        cost, path = graph.dijkstra("A", "B")
+        if path == ["A", "B"]:
+            print("[3/3] Simple pathfinding... OK")
+            print("\nResult: SYSTEM INTEGRITY VERIFIED")
+            return True
+        else:
+            print("[3/3] Simple pathfinding... FAILED")
+            return False
+    except Exception as e:
+        print(f"\n[Error] Smoke test failed: {e}")
+        return False
+
 def main_menu():
+    # Handle CI/CD smoke test argument
+    if "--smoke-test" in sys.argv:
+        success = smoke_test()
+        sys.exit(0 if success else 1)
+
     # Setup paths relative to this script
     base_dir = os.path.dirname(os.path.abspath(__file__))
     web_dir = os.path.join(base_dir, "demo_web")

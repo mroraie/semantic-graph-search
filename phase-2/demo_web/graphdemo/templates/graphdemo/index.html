@@ -26,9 +26,13 @@
 <body class="bg-gray-50 min-h-screen">
     <div class="max-w-6xl mx-auto py-10 px-4">
         <!-- Header -->
-        <header class="text-center mb-10">
-            <h1 class="text-3xl font-bold text-gray-800">داشبورد جستجوی گراف معنایی</h1>
-            <p class="text-gray-600 mt-2">تحلیل مسیر، کیفیت و عملکرد الگوریتم‌ها</p>
+        <header class="text-center mb-10 relative">
+            <div class="absolute top-0 left-0 flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-100">
+                <div id="llm_status_dot" class="w-2.5 h-2.5 rounded-full bg-gray-300"></div>
+                <span class="text-[10px] font-bold text-gray-500">وضعیت LLM</span>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800">سامانه جستجوی گراف معنایی</h1>
+            <p class="text-gray-600 mt-2">پروژه پایانی درس طراحی الگوریتم</p>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -58,6 +62,24 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">مفاهیم (جدا شده با ویرگول):</label>
                         <textarea name="concepts" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-24 text-sm">{{ concepts_input }}</textarea>
                     </div>
+
+                    <div id="manual_edges_container" {% if sim_mode == "llm" %}style="display: none;"{% endif %}>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">دامنه ارتباط (یال‌های دستی، هر خط: A -> B):</label>
+                        <textarea name="manual_edges" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-24 text-sm font-mono" placeholder="CPU -> processor
+processor -> hardware">{{ manual_edges_input }}</textarea>
+                        <div class="mt-1 text-[10px] text-gray-500">اگر این کادر را پر کنید، گراف از همین یال‌ها ساخته می‌شود و شباهت‌سنجی نادیده گرفته می‌شود.</div>
+                    </div>
+
+                    <script>
+                        document.querySelector('select[name="sim_mode"]').addEventListener('change', function() {
+                            const container = document.getElementById('manual_edges_container');
+                            if (this.value === 'llm') {
+                                container.style.display = 'none';
+                            } else {
+                                container.style.display = 'block';
+                            }
+                        });
+                    </script>
                     
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -76,12 +98,11 @@
                             <select name="sim_mode" class="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white">
                                 <option value="rule" {% if sim_mode == "rule" %}selected{% endif %}>Rule-based (ساده)</option>
                                 <option value="llm" {% if sim_mode == "llm" %}selected{% endif %}>LLM Embedding (دقیق)</option>
-                                <option value="matrix" {% if sim_mode == "matrix" %}selected{% endif %}>ماتریس دستی (Manual)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">آستانه (Threshold):</label>
-                            <input type="number" step="0.01" name="threshold" value="{{ threshold }}" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">آستانه ارتباط (Edge):</label>
+                            <input type="number" step="0.01" name="threshold" value="{{ threshold }}" class="w-full p-2 border border-gray-200 bg-blue-50/30 rounded-lg text-sm font-bold text-blue-700" title="حداقل شباهت برای ایجاد یال بین دو کلمه">
                         </div>
                     </div>
 
@@ -202,7 +223,7 @@
                     </div>
                 </div>
 
-                <!-- Graph Metrics -->
+                <!-- Graph Metrics & Visualization -->
                 {% if graph_metrics %}
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
@@ -223,19 +244,112 @@
                             <div class="flex justify-between text-sm"><span class="text-gray-500">کمترین درجه:</span> <span class="font-bold">{{ graph_metrics.min_degree }}</span></div>
                         </div>
                     </div>
+
+                    {% if viz_data_json %}
+                    <div class="mt-8 border-t pt-6">
+                        <h4 class="text-sm font-bold text-gray-700 mb-3">نمایش گراف معنایی</h4>
+                        <div id="graph_viz" class="w-full h-[360px] rounded-lg border bg-white"></div>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
         </div>
         
         <footer class="mt-16 text-center text-gray-400 text-sm border-t pt-8">
-            سامانه ارزیابی هوشمند گراف‌های معنایی — ۱۳۹۴-۱۴۰۲
         </footer>
     </div>
 
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <script>
+        const vizDataJson = `{% if viz_data_json %}{{ viz_data_json|escapejs }}{% endif %}`;
+        if (vizDataJson) {
+            const data = JSON.parse(vizDataJson);
+            const container = document.getElementById('graph_viz');
+            if (container) {
+                const width = container.clientWidth || 800;
+                const height = container.clientHeight || 360;
+
+                const svg = d3.select(container)
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height);
+
+                const link = svg.append('g')
+                    .attr('stroke', '#cbd5e1')
+                    .attr('stroke-opacity', 1)
+                    .selectAll('line')
+                    .data(data.links)
+                    .join('line')
+                    .attr('stroke-width', d => 1 + (d.value || 0) * 2);
+
+                const node = svg.append('g')
+                    .attr('stroke', '#fff')
+                    .attr('stroke-width', 1.5)
+                    .selectAll('circle')
+                    .data(data.nodes)
+                    .join('circle')
+                    .attr('r', 10)
+                    .attr('fill', '#60a5fa')
+                    .call(d3.drag()
+                        .on('start', dragstarted)
+                        .on('drag', dragged)
+                        .on('end', dragended));
+
+                const label = svg.append('g')
+                    .selectAll('text')
+                    .data(data.nodes)
+                    .join('text')
+                    .text(d => d.id)
+                    .attr('font-size', 12)
+                    .attr('fill', '#111827')
+                    .attr('dx', 12)
+                    .attr('dy', 4);
+
+                const simulation = d3.forceSimulation(data.nodes)
+                    .force('link', d3.forceLink(data.links).id(d => d.id).distance(90))
+                    .force('charge', d3.forceManyBody().strength(-280))
+                    .force('center', d3.forceCenter(width / 2, height / 2))
+                    .on('tick', ticked);
+
+                function ticked() {
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    node
+                        .attr('cx', d => d.x)
+                        .attr('cy', d => d.y);
+
+                    label
+                        .attr('x', d => d.x)
+                        .attr('y', d => d.y);
+                }
+
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+
+                function dragged(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }
+            }
+        }
+
         async function checkLLMStatus() {
             const dot = document.getElementById('llm_status_dot');
+            if (!dot) return;
             try {
                 const response = await fetch('/llm_status/');
                 const data = await response.json();

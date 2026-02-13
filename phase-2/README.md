@@ -226,7 +226,7 @@ python Performance_Analysis/main.py
 ## ۷. وب‌دمو با Django
 
 برای نمایش تعاملی گراف معنایی و مسیرهای پیدا شده، یک وب‌دمو ساده با Django در فولدر `demo_web/` پیاده‌سازی شده است.
-
+![[Screenshot 2026-02-13 145446.png]]
 - **ساختار پروژه‌ی وب**  
   - فایل `demo_web/manage.py`: اسکریپت اجرای سرور Django.  
   - فایل  `demo_web/demo_web/settings.py`, `urls.py`, `wsgi.py`: تنظیمات مینیمال پروژه.  
@@ -235,10 +235,9 @@ python Performance_Analysis/main.py
     - فایل  `graphdemo/templates/graphdemo/index.html`: صفحه‌ی HTML با CSS ساده که فرم ورود مفاهیم و مسیر خروجی را نمایش می‌دهد.  
 
 - **نحوه اجرا**  
-  از ریشه‌ی پروژه:
 
   ```bash
-  python manage.py runserver
+  python runner.py ; option 3 or 4
   ```
 
   سپس در مرورگر به آدرس `http://127.0.0.1:8000/` ، لیستی از مفاهیم (با ویرگول جدا شده) و گره‌های مبدأ و مقصد را وارد کنید تا مسیر معنایی پیشنهادی روی گراف دمو نمایش داده شود.

@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Optional, Set, Callable
 from dataclasses import dataclass
 import json
 
-from phase_2.src.algorithms import (
+from .algorithms import (
     bfs_impl,
     dfs_impl,
     dijkstra_impl,
