@@ -1,0 +1,43 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ phase-2, main ]
+  pull_request:
+    branches: [ phase-2, main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Check Code Style (Style Check)
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run Automated Tests (Unit Tests)
+      run: |
+        python phase-2/src/tests.py
+
+    - name: Simple Analysis
+      run: |
+        echo "Running simple code analysis..."
+        python -c "import pathlib; p=list(pathlib.Path('.').rglob('*.py')); print('Python files:', len(p))"
+        find . -name "*.py" | xargs wc -l
+
