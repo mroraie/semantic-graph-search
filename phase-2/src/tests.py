@@ -81,6 +81,45 @@ class TestSemanticGraphAlgorithms(unittest.TestCase):
         print("\nTheoretical Comparison: Small graph results match expected O(V+E) behavior.")
         self.assertTrue(True)
 
+    def test_dfs_path(self):
+        """Test DFS finds a path."""
+        order = self.graph.dfs("A")
+        self.assertIn("C", order)
+        self.assertIn("B", order)
+
+    def test_a_star_path(self):
+        """Test A* finds the optimal path."""
+        # For conceptual test, heuristic returns 0 (acts like Dijkstra)
+        cost, path = self.graph.a_star("A", "C", heuristic=lambda u, v: 0)
+        self.assertEqual(path, ["A", "B", "C"])
+
+    def test_floyd_warshall_correctness(self):
+        """Test Floyd-Warshall finds all-pairs shortest paths."""
+        dist, next_hop = self.graph.floyd_warshall()
+        # Path A to C should be via B
+        path = self.graph.reconstruct_path("A", "C", next_hop)
+        self.assertEqual(path, ["A", "B", "C"])
+
+    def test_graph_statistics(self):
+        """Test graph statistics reporting."""
+        stats = self.graph.get_statistics()
+        self.assertEqual(stats["num_nodes"], 5)
+        self.assertEqual(stats["num_edges"], 8) # 4 bidirectional edges
+
+    def test_serialization(self):
+        """Test saving and loading graph from file."""
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            self.graph.save_to_file(tmp_path)
+            loaded_graph = SemanticGraph.load_from_file(tmp_path)
+            self.assertEqual(len(loaded_graph.get_all_nodes()), 5)
+            self.assertEqual(len(loaded_graph.get_all_edges()), 8)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
 if __name__ == "__main__":
     unittest.main()
 
