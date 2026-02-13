@@ -255,7 +255,7 @@ def index(request):
                 "memory_kb": f"{peak_mem / 1024:.2f}"
             }
 
-            except Exception as e:
+        except Exception as e:
                 tracemalloc.stop()
                 context["error"] = f"Error: {str(e)}"
                 return render(request, "graphdemo/index.html", context)
