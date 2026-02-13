@@ -256,11 +256,11 @@ def index(request):
             }
 
         except Exception as e:
-                tracemalloc.stop()
-                context["error"] = f"Error: {str(e)}"
-                return render(request, "graphdemo/index.html", context)
+            tracemalloc.stop()
+            context["error"] = f"Error: {str(e)}"
+            return render(request, "graphdemo/index.html", context)
 
-            if path:
+        if path:
                 context["path"] = path
                 context["cost"] = f"{cost:.4f}" if cost is not None else "N/A"
             else:
