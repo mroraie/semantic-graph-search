@@ -255,16 +255,16 @@ def index(request):
                 "memory_kb": f"{peak_mem / 1024:.2f}"
             }
 
-        except Exception as e:
-            tracemalloc.stop()
-            context["error"] = f"Error: {str(e)}"
-            return render(request, "graphdemo/index.html", context)
-
-        if path:
+            if path:
                 context["path"] = path
                 context["cost"] = f"{cost:.4f}" if cost is not None else "N/A"
             else:
                 context["error"] = "No semantic path found between these concepts."
+
+        except Exception as e:
+            tracemalloc.stop()
+            context["error"] = f"Error: {str(e)}"
+            return render(request, "graphdemo/index.html", context)
 
     return render(request, "graphdemo/index.html", context)
 
