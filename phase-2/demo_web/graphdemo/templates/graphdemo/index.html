@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <title>Semantic Graph Search Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @font-face {
+            font-family: 'Dana';
+            src: url('/static/fonts/dana-regular.woff2') format('woff2');
+            font-weight: normal;
+        }
+        body {
+            font-family: 'Dana', Tahoma, sans-serif;
+            direction: rtl;
+        }
+        .path-node {
+            transition: all 0.3s ease;
+        }
+        .path-node:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-6xl mx-auto py-10 px-4">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-3xl font-bold text-gray-800">داشبورد جستجوی گراف معنایی</h1>
+            <p class="text-gray-600 mt-2">تحلیل مسیر، کیفیت و عملکرد الگوریتم‌ها</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Form Section -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2">تنظیمات جستجو</h2>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">سناریوهای آماده:</label>
+                    <form method="post" class="flex flex-wrap gap-2">
+                        {% csrf_token %}
+                        {% for key, scenario in scenarios.items %}
+                            <button type="submit" name="scenario" value="{{ key }}" 
+                                    class="px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-colors
+                                    {% if 'easy' in key %}bg-emerald-500 hover:bg-emerald-600
+                                    {% elif 'medium' in key %}bg-amber-500 hover:bg-amber-600
+                                    {% else %}bg-rose-500 hover:bg-rose-600{% endif %}">
+                                {{ scenario.name }}
+                            </button>
+                        {% endfor %}
+                    </form>
+                </div>
+
+                <form method="post" class="space-y-4">
+                    {% csrf_token %}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">مفاهیم (جدا شده با ویرگول):</label>
+                        <textarea name="concepts" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-24 text-sm">{{ concepts_input }}</textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">مبدأ:</label>
+                            <input type="text" name="start" value="{{ start }}" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">مقصد:</label>
+                            <input type="text" name="goal" value="{{ goal }}" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">محاسبه شباهت:</label>
+                            <select name="sim_mode" class="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                <option value="rule" {% if sim_mode == "rule" %}selected{% endif %}>Rule-based (ساده)</option>
+                                <option value="llm" {% if sim_mode == "llm" %}selected{% endif %}>LLM Embedding (دقیق)</option>
+                                <option value="matrix" {% if sim_mode == "matrix" %}selected{% endif %}>ماتریس دستی (Manual)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">آستانه (Threshold):</label>
+                            <input type="number" step="0.01" name="threshold" value="{{ threshold }}" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-blue-50/50 rounded-lg border border-blue-100 space-y-3">
+                        <span class="text-xs font-bold text-blue-600 block mb-1">پارامترهای پیشرفته الگوریتم:</span>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] text-gray-500 mb-1">حداکثر عمق (BFS/DFS):</label>
+                                <input type="number" name="max_depth" value="{{ max_depth }}" placeholder="نامحدود" class="w-full p-1.5 border border-gray-200 rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-gray-500 mb-1">حداقل شباهت یال (Search):</label>
+                                <input type="number" step="0.01" name="min_similarity_param" value="{{ min_similarity_param }}" placeholder="مانند آستانه" class="w-full p-1.5 border border-gray-200 rounded text-xs">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-md mt-4">اجرای تحلیل و جستجو</button>
+                </form>
+            </div>
+
+            <!-- Results Section -->
+            <div class="lg:col-span-2 space-y-8">
+                {% if error %}
+                <div class="bg-rose-50 border-r-4 border-rose-500 p-4 rounded-lg flex items-center gap-3">
+                    <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span class="text-rose-700 font-medium">{{ error }}</span>
+                </div>
+                {% endif %}
+
+                {% if path %}
+                <!-- Path Visualizer -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A2 2 0 013 15.492V4.508a2 2 0 011.553-1.954L9 1v19zM9 20l6-3m0 3V4m0 0l5.447 2.724A2 2 0 0121 8.508v10.984a2 2 0 01-1.553 1.954L15 23l-6-3z"></path></svg>
+                        مسیر معنایی پیدا شده
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-4 justify-center py-8">
+                        {% for node in path %}
+                        <div class="path-node flex items-center">
+                            <div class="px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg font-bold shadow-sm">
+                                {{ node }}
+                            </div>
+                            {% if not forloop.last %}
+                            <svg class="w-6 h-6 text-gray-300 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Path Quality -->
+                    <div class="grid grid-cols-2 gap-4 mt-8 border-t pt-6">
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <span class="block text-gray-500 text-sm mb-1">شباهت کلی مسیر</span>
+                            <span class="text-2xl font-bold text-blue-600">{{ cost }}</span>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <span class="block text-gray-500 text-sm mb-1">طول مسیر (گام‌ها)</span>
+                            <span class="text-2xl font-bold text-gray-800">{{ path|length|add:"-1" }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Execution Stats -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
+                        آمار اجرایی الگوریتم
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="p-4 border rounded-xl bg-white">
+                            <span class="text-xs text-gray-500">زمان اجرا (کل)</span>
+                            <div class="text-lg font-bold">{{ performance.total_ms }}ms</div>
+                        </div>
+                        <div class="p-4 border rounded-xl bg-white">
+                            <span class="text-xs text-gray-500">گره‌های بازدید شده</span>
+                            <div class="text-lg font-bold text-amber-600">{{ performance.nodes_visited }}</div>
+                        </div>
+                        <div class="p-4 border rounded-xl bg-white">
+                            <span class="text-xs text-gray-500">ساختار گراف</span>
+                            <div class="text-lg font-bold text-gray-700">{{ performance.num_nodes }}V / {{ performance.num_edges }}E</div>
+                        </div>
+                        <div class="p-4 border rounded-xl bg-white">
+                            <span class="text-xs text-gray-500">مصرف حافظه (پیک)</span>
+                            <div class="text-lg font-bold text-emerald-600">{{ performance.memory_kb }} KB</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Comparative Report Table -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        تحلیل مقایسه‌ای الگوریتم‌ها (تئوری)
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-right border-collapse">
+                            <thead class="bg-gray-50 text-gray-700 font-bold border-b">
+                                <tr>
+                                    <th class="p-3">الگوریتم</th>
+                                    <th class="p-3">زمان (Worst)</th>
+                                    <th class="p-3">فضا (Worst)</th>
+                                    <th class="p-3">ویژگی بارز</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                {% for key, analysis in complexity_data.items %}
+                                <tr class="hover:bg-blue-50/50 transition-colors">
+                                    <td class="p-3 font-bold text-blue-700">{{ analysis.algorithm_name }}</td>
+                                    <td class="p-3 font-mono">{{ analysis.time_worst }}</td>
+                                    <td class="p-3 font-mono">{{ analysis.space_worst }}</td>
+                                    <td class="p-3 text-gray-600 text-xs">{{ analysis.description|truncatewords:15 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Graph Metrics -->
+                {% if graph_metrics %}
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="text-lg font-bold mb-6 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        مشخصات توپولوژیک گراف فعلی
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm"><span class="text-gray-500">تراکم (Density):</span> <span class="font-bold">{{ graph_metrics.density|stringformat:".4f" }}</span></div>
+                            <div class="flex justify-between text-sm"><span class="text-gray-500">میانگین درجه:</span> <span class="font-bold">{{ graph_metrics.average_degree|stringformat:".2f" }}</span></div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm"><span class="text-gray-500">میانگین شباهت:</span> <span class="font-bold text-emerald-600">{{ graph_metrics.average_similarity|stringformat:".2f" }}</span></div>
+                            <div class="flex justify-between text-sm"><span class="text-gray-500">بیشترین شباهت:</span> <span class="font-bold">{{ graph_metrics.max_similarity|stringformat:".2f" }}</span></div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm"><span class="text-gray-500">نوع گراف:</span> <span class="px-2 py-0.5 rounded text-xs font-bold {% if graph_metrics.graph_type == 'dense' %}bg-purple-100 text-purple-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ graph_metrics.graph_type }}</span></div>
+                            <div class="flex justify-between text-sm"><span class="text-gray-500">کمترین درجه:</span> <span class="font-bold">{{ graph_metrics.min_degree }}</span></div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <footer class="mt-16 text-center text-gray-400 text-sm border-t pt-8">
+            سامانه ارزیابی هوشمند گراف‌های معنایی — ۱۳۹۴-۱۴۰۲
+        </footer>
+    </div>
+
+    <script>
+        async function checkLLMStatus() {
+            const dot = document.getElementById('llm_status_dot');
+            try {
+                const response = await fetch('/llm_status/');
+                const data = await response.json();
+                dot.className = data.ok ? 'w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'w-2.5 h-2.5 rounded-full bg-rose-500';
+            } catch {
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+            }
+        }
+        checkLLMStatus();
+        setInterval(checkLLMStatus, 5000);
+    </script>
+</body>
+</html>
